@@ -1,8 +1,10 @@
+# -*- org-latex-listings: t; -*-
 #+TITLE: Notes regarding the NAT schema
 #+AUTHOR: Lukas Juhrich
 #+LATEX_HEADER: \usepackage{amsmath,amsthm,amssymb,amsfonts,mathabx,mathtools,mathrsfs}
 #+LATEX_HEADER: \usepackage{tikz}
 #+LATEX_HEADER: \usepackage{tikz-cd}
+#+LATEX_HEADER: \usepackage{listings,lmodern,minted}
 #+LATEX_HEADER: \DeclareUnicodeCharacter{2200}{\ensuremath{\forall}}
 #+LATEX_HEADER: \DeclareUnicodeCharacter{2203}{\ensuremath{\exists}}
 #+LATEX_HEADER: \newcommand{\then}{\mathbin{;}}

@@ -2,7 +2,7 @@
     SSH_TARGET=${SSH_TARGET:-at:public_html}
 
 pdf:
-    emacs --batch -l org --eval "(add-hook 'org-mode-hook (lambda () (org-latex-export-to-pdf)))" nat.org
+    emacs --batch -l org -l emacs_convert.el nat.org
 
 deploy: pdf @confirm:secure
     scp $FILE $SSH_TARGET/$FILE

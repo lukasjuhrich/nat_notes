@@ -7,7 +7,7 @@
 #+LATEX_HEADER: \DeclareUnicodeCharacter{2203}{\ensuremath{\exists}}
 #+LATEX_HEADER: \newcommand{\then}{\mathbin{;}}
 
-* Abstract concept
+* Concept / Requirements
 
 I'll assume you've looked at the sql table definitions.  All we want
 to realize (by means of foreign keys or otherwise) are the following
@@ -28,6 +28,11 @@ relations:
 
 *** =outip_dom= (Hard FKey)
     FKey =outip(dom) → dom(id)=
+
+    Technically, this key is redundant, because the domain is already
+    given my the domain of the referenced inside network.  However,
+    since the inside network is referenced only “softly” (i.e.,
+    without an FKey), it's helpful to include it.
 
 *** =innet_dom= (Hard FKey)
     FKey =innet(dom) → dom(id)=
@@ -106,23 +111,58 @@ To sum up, we get the following commutativity rules:
 #+end_export
 
 
-* TODO Implement domains
+** Behavioral requirements
 
-#+BEGIN_SRC sql
+*** Cascades
+    Most relationships given there should have corresponding =ON
+    UPDATE=/=ON DELETE= options.  To be listed.
+
+*** TODO A user changes his IP
+
+*** A user moves out
+    - =OutIp.owner= will be set to null
+    - All corresponding Host reservations (ref'd by a forwarding
+      ref'ing this IP) should be deleted
+    - All corresponding Forwardings (ref'ing this out_ip) should get deleted
+    - All corresponding translations should get deleted
+
+
+* Motivating example
+
+Consider
+
+- A =Domain= with id 1 (not explicitly mentioned in the other tables)
+- An =OutsideIpAddress(1.1.1.1/32, owner=Hans)=
+- An =InternalNetwork(10.64.1.0/24)=, meant to be Hans' Home network
+- An =InternalNetwork(10.100.1.0/24)=, meant to be the roaming network of some
+  location used by many people
+- A =Translation(10.64.1.0/24, 1.1.1.1/32)=
+- A =Translation(10.100.1.1/32, 1.1.1.1/32)=
+
+This already emphasizes some key features of this schema:
+- An =OutsideIpAddress= may have multiple translations associated to it
+- The inclusion =Translation.internal_network= $\subseteq$
+  =InternalNetwork.ip_network= can be proper
+
+
+* Realization (Schrader)
+** Custom domains
+
+ #+BEGIN_SRC sql
 CREATE DOMAIN public.ip_port AS integer
 	CONSTRAINT ip_port_check CHECK (((VALUE >= 1) AND (VALUE <= 65535)));
 CREATE DOMAIN public.ip_protocol AS smallint
 	CONSTRAINT ip_protocol_check CHECK (((VALUE >= 0) AND (VALUE <= 255)));
-#+END_SRC
+ #+END_SRC
 
-Perhaps follow [[https://github.com/zzzeek/sqlalchemy/blob/master/lib/sqlalchemy/dialects/postgresql/json.py#L71][the JSON implementation]]
+ Perhaps follow [[https://github.com/zzzeek/sqlalchemy/blob/master/lib/sqlalchemy/dialects/postgresql/json.py#L71][the JSON implementation]]
 
-Also, see [[https://docs.sqlalchemy.org/en/13/core/ddl.html#sqlalchemy.schema.CreateColumn][the CreateColumn example]]
+ Also, see [[https://docs.sqlalchemy.org/en/13/core/ddl.html#sqlalchemy.schema.CreateColumn][the CreateColumn example]]
 
-** Testing the custom type
-To test, perhaps select the following minimal example:
+*** Testing the custom type
+ To test, perhaps select the following minimal example:
 
-#+BEGIN_SRC python
+ #+BEGIN_SRC python
 from sqlalchemy import Table, Metadata, Column, Integer, String
 from sqlalchemy import schema
 
@@ -135,11 +175,11 @@ table = Table('mytable', MetaData(),
     )
 
 metadata.create_all(conn)
-#+END_SRC
+ #+END_SRC
 
-…and in a test, we might do the following:
+ …and in a test, we might do the following:
 
-#+BEGIN_SRC python
+ #+BEGIN_SRC python
 from unittest import TestCase
 from pycroft.model.types import IpPort
 
@@ -174,11 +214,11 @@ class IpPortTestCase(TestCase):
     def test_constraint(self):
         # TODO try to add something violating the check constraints
         pass
-#+END_SRC
+ #+END_SRC
 
-Perhaps the following should suffice:
+ Perhaps the following should suffice:
 
-#+BEGIN_SRC python
+ #+BEGIN_SRC python
 
 class IpPort(sqltypes.TypeEngine):
     """Represent our custom IpPort type.
@@ -188,14 +228,14 @@ class IpPort(sqltypes.TypeEngine):
 
 
 ischema_names["ip_port"] = IpPort
-#+END_SRC
+ #+END_SRC
 
 
-* Local Constraints
-** TODO Collect PKey-Constraints
-** TODO Collect Uniq-Constraints
-** OutsideIpAddress.ip_address is /32,v4
-#+BEGIN_SRC sql
+** Local Constraints
+*** TODO Collect PKey-Constraints
+*** TODO Collect Uniq-Constraints
+*** OutsideIpAddress.ip_address is /32,v4
+ #+BEGIN_SRC sql
 --- OutsideIPAddress is /32v4
 CREATE TABLE public."OutsideIPAddress" (
     nat_domain integer NOT NULL,
@@ -204,28 +244,28 @@ CREATE TABLE public."OutsideIPAddress" (
     CONSTRAINT "OutsideIPAddress_ip_address_host"
         CHECK (((family(ip_address) = 4) AND (masklen(ip_address) = 32)))
 );
-#+END_SRC
+ #+END_SRC
 
-Realizable as follows:
+ Realizable as follows:
 
-#+BEGIN_SRC python
+ #+BEGIN_SRC python
 __table_args__ = (
     CheckConstraint(
         '(((family(ip_address) = 4) AND (masklen(ip_address) = 32)))',
         name='outside_ip_is_host_and_v4',
     ),
 )
-#+END_SRC
+ #+END_SRC
 
-** OutsideIpAddress.ip is /32,v4
-#+BEGIN_SRC sql
+*** OutsideIpAddress.ip is /32,v4
+ #+BEGIN_SRC sql
 --- DhcpHostReservation refs /32v4
 ALTER TABLE public."DHCPHostReservation"
     ADD CONSTRAINT "DHCPHostReservation_ip_check" CHECK (((family(ip) = 4) AND (masklen(ip) = 32))) NOT VALID;
-#+END_SRC
+ #+END_SRC
 
-** Forwarding.protocol $\in \{6, 17, 33, 132\}$
-#+BEGIN_SRC sql
+*** Forwarding.protocol $\in \{6, 17, 33, 132\}$
+ #+BEGIN_SRC sql
 --- Forwarding protocol in ${6,17,33,132}$
 ALTER TABLE public."Forwarding"
     ADD CONSTRAINT "Forwarding_protocol_port_check" CHECK (
@@ -233,27 +273,27 @@ CASE
     WHEN ((outside_port IS NOT NULL) OR (inside_port IS NOT NULL)) THEN ((protocol)::smallint = ANY (ARRAY[6, 17, 33, 132]))
     ELSE NULL::boolean
 END) NOT VALID;
-#+END_SRC
+ #+END_SRC
 
-** InsideNetwork.(gateway << ip_network)
-#+BEGIN_SRC sql
+*** InsideNetwork.(gateway << ip_network)
+ #+BEGIN_SRC sql
 --- Gateway << InsideNetwork
 ALTER TABLE public."InsideNetwork"
     ADD CONSTRAINT "InsideNetwork_gateway_check" CHECK ((gateway << ip_network)) NOT VALID;
-#+END_SRC
+ #+END_SRC
 
-** InsideNetwork.ip_network is /32,v4
-#+BEGIN_SRC sql
+*** InsideNetwork.ip_network is /32,v4
+ #+BEGIN_SRC sql
 --- in_net is v4
 ALTER TABLE public."InsideNetwork"
     ADD CONSTRAINT "InsideNetwork_ip_network_family_check" CHECK ((family(ip_network) = 4)) NOT VALID;
-#+END_SRC
+ #+END_SRC
 
 
-* Rel constraints
-** TODO Collect FKey-Constraints
-** Forwarding needs a translation (unused)
-#+BEGIN_SRC sql
+** Rel constraints
+*** TODO Collect FKey-Constraints
+*** Forwarding needs a translation (unused)
+ #+BEGIN_SRC sql
 --- TODO hold on a sec, this is not even used!
 CREATE FUNCTION public."Forwarding_Translation_exists"() RETURNS trigger
     LANGUAGE plpgsql
@@ -264,21 +304,21 @@ CREATE FUNCTION public."Forwarding_Translation_exists"() RETURNS trigger
 	RETURN NEW;
 END$$;
 'col2 > col3 + 5', name='check1'
-#+END_SRC
+ #+END_SRC
 
-** InsideNetwork.ip_network disjoint
-#+BEGIN_SRC sql
+*** InsideNetwork.ip_network disjoint
+ #+BEGIN_SRC sql
 -- in_nets are disjoint
 ALTER TABLE ONLY public."InsideNetwork"
     ADD CONSTRAINT "InsideNetwork_nat_domain_ip_network_excl" EXCLUDE USING gist (nat_domain WITH =, ip_network inet_ops WITH &&);
-#+END_SRC
+ #+END_SRC
 
-** DHCPHostReservation.inside_network exists
-*** reasoning
-    This realizes the weak fkey =DHCPHostReservation.inside_network<<=InsideNetwork
+*** DHCPHostReservation.inside_network exists
+**** reasoning
+     This realizes the weak fkey =DHCPHostReservation.inside_network<<=InsideNetwork
 
-*** src
-#+BEGIN_SRC sql
+**** src
+ #+BEGIN_SRC sql
 CREATE FUNCTION public."DHCPHostReservation_InsideNetwork_exists"() RETURNS trigger
     LANGUAGE plpgsql STABLE STRICT LEAKPROOF
     AS $$BEGIN
@@ -291,20 +331,20 @@ CREATE CONSTRAINT TRIGGER "DHCPHostReservation_InsideNetwork_exists"
     AFTER INSERT OR UPDATE OF ip ON public."DHCPHostReservation"
     DEFERRABLE INITIALLY IMMEDIATE
     FOR EACH ROW EXECUTE PROCEDURE public."DHCPHostReservation_InsideNetwork_exists"();
-#+END_SRC
-** Translation.inside_network disjoint
-#+BEGIN_SRC sql
+ #+END_SRC
+*** Translation.inside_network disjoint
+ #+BEGIN_SRC sql
 --- Translation in_nets excluded
 ALTER TABLE ONLY public."Translation"
     ADD CONSTRAINT "Translation_Inside_excl" EXCLUDE USING gist (nat_domain WITH =, inside_network inet_ops WITH &&);
-#+END_SRC
+ #+END_SRC
 
-** ∀Translation ∃InsideNetwork
-*** reasoning
-    This realizes the weak fkey =Translation.inside_network<<=InsideNetwork=
+*** ∀Translation ∃InsideNetwork
+**** reasoning
+     This realizes the weak fkey =Translation.inside_network<<=InsideNetwork=
 
-*** src
-#+BEGIN_SRC sql
+**** src
+ #+BEGIN_SRC sql
 CREATE FUNCTION public."Translation_InsideNetwork_exists"() RETURNS trigger
     LANGUAGE plpgsql STRICT
     AS $$BEGIN
@@ -318,21 +358,21 @@ CREATE CONSTRAINT TRIGGER "Translation_InsideNetwork_exists"
     AFTER INSERT OR UPDATE OF inside_network ON public."Translation"
     DEFERRABLE INITIALLY IMMEDIATE
     FOR EACH ROW EXECUTE PROCEDURE public."Translation_InsideNetwork_exists"();
-#+END_SRC
+ #+END_SRC
 
 
-* Cascades
-** InsideNetwork del/up/trunc
-*** reasoning
-    These are effectively cascades to =DHCPHostReservation=,
-    =Translation=.  This is necessary because
-    - =DHCPHostReservation.ip << InsideNetwork.ip_network=
-    - =Translation.inside_network << InsideNetwork.ip_network=
+** Cascades
+*** InsideNetwork del/up/trunc
+**** reasoning
+     These are effectively cascades to =DHCPHostReservation=,
+     =Translation=.  This is necessary because
+     - =DHCPHostReservation.ip << InsideNetwork.ip_network=
+     - =Translation.inside_network << InsideNetwork.ip_network=
 
-    are weak couplings instead of FKeys.
+     are weak couplings instead of FKeys.
 
-*** src
-#+BEGIN_SRC sql
+**** src
+ #+BEGIN_SRC sql
 CREATE FUNCTION public."InsideNetwork_delete"() RETURNS trigger
     LANGUAGE plpgsql STRICT LEAKPROOF
     AS $$BEGIN
@@ -359,10 +399,10 @@ CREATE FUNCTION public."InsideNetwork_update"() RETURNS trigger
 	RETURN NULL;
 END$$;
 CREATE TRIGGER "InsideNetwork_update" AFTER UPDATE OF ip_network ON public."InsideNetwork" FOR EACH ROW EXECUTE PROCEDURE public."InsideNetwork_update"();
-#+END_SRC
+ #+END_SRC
 
-** Translation del/up (unused)
-#+BEGIN_SRC sql
+*** Translation del/up (unused)
+ #+BEGIN_SRC sql
 --- UNUSED
 CREATE FUNCTION public."Translation_delete"() RETURNS trigger
     LANGUAGE plpgsql STRICT LEAKPROOF
@@ -378,16 +418,16 @@ CREATE FUNCTION public."Translation_update"() RETURNS trigger
 	DELETE FROM "Forwarding" WHERE nat_domain = OLD.nat_domain AND inside_address <<= OLD.inside_network AND NOT inside_address <<= NEW.inside_network;
 	RETURN NULL;
 END$$;
-#+END_SRC
+ #+END_SRC
 
-** Translation truncate
-*** reasoning?
-    This realizes a cascade to =Forwarding= – but wouldn't this make
-    more sense on =InsideNetwork= or =OutsideIpAddress=?  Or anything
-    to which we have a weak relationship?
+*** Translation truncate
+**** reasoning?
+     This realizes a cascade to =Forwarding= – but wouldn't this make
+     more sense on =InsideNetwork= or =OutsideIpAddress=?  Or anything
+     to which we have a weak relationship?
 
-*** src
-#+BEGIN_SRC sql
+**** src
+ #+BEGIN_SRC sql
 CREATE FUNCTION public."Translation_truncate"() RETURNS trigger
     LANGUAGE plpgsql STRICT LEAKPROOF
     AS $$BEGIN
@@ -396,4 +436,4 @@ CREATE FUNCTION public."Translation_truncate"() RETURNS trigger
 END$$;
 CREATE TRIGGER "Translation_truncate" AFTER TRUNCATE ON public."Translation" FOR EACH STATEMENT EXECUTE PROCEDURE public."Translation_truncate"();
 --- FKEY-Constraints…
-#+END_SRC
+ #+END_SRC

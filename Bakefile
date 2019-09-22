@@ -4,5 +4,5 @@
 pdf:
     emacs --batch -l org -l emacs_convert.el nat.org
 
-deploy: pdf @confirm:secure
+deploy: pdf @confirm
     scp $FILE $SSH_TARGET/$FILE

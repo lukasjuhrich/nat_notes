@@ -133,6 +133,15 @@ To sum up, we get the following commutativity rules:
     - All corresponding translations should get deleted
 
 
+** Local Requirements
+   - IPs should be =v4=
+   - Outside-Ips should be =/32=
+   - gateway of =InsideNetwork= should be part of the network
+   - Forwarding protocol must be in $\{6,17,33,132\}$
+   - IP ports must be in $\{1..65535\}$
+   - IP protocols must be in $\{0..255\}$ (okay, that's kinda
+     redundant, but if we're doing custom types anyway, we might as
+     well itnroduce that one)
 * Motivating example
 
 Consider

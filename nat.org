@@ -456,5 +456,5 @@ CREATE FUNCTION public."Translation_truncate"() RETURNS trigger
 	RETURN NULL;
 END$$;
 CREATE TRIGGER "Translation_truncate" AFTER TRUNCATE ON public."Translation" FOR EACH STATEMENT EXECUTE PROCEDURE public."Translation_truncate"();
---- FKEY-Constraints…
+--- FKEY-Constraints
  #+END_SRC

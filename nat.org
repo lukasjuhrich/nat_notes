@@ -263,7 +263,8 @@ __table_args__ = (
  #+BEGIN_SRC sql
 --- DhcpHostReservation refs /32v4
 ALTER TABLE public."DHCPHostReservation"
-    ADD CONSTRAINT "DHCPHostReservation_ip_check" CHECK (((family(ip) = 4) AND (masklen(ip) = 32))) NOT VALID;
+    ADD CONSTRAINT "DHCPHostReservation_ip_check"
+    CHECK (((family(ip) = 4) AND (masklen(ip) = 32))) NOT VALID;
  #+END_SRC
 
 *** Forwarding.protocol $\in \{6, 17, 33, 132\}$
@@ -272,7 +273,8 @@ ALTER TABLE public."DHCPHostReservation"
 ALTER TABLE public."Forwarding"
     ADD CONSTRAINT "Forwarding_protocol_port_check" CHECK (
 CASE
-    WHEN ((outside_port IS NOT NULL) OR (inside_port IS NOT NULL)) THEN ((protocol)::smallint = ANY (ARRAY[6, 17, 33, 132]))
+    WHEN ((outside_port IS NOT NULL) OR (inside_port IS NOT NULL))
+    THEN ((protocol)::smallint = ANY (ARRAY[6, 17, 33, 132]))
     ELSE NULL::boolean
 END) NOT VALID;
  #+END_SRC
@@ -281,14 +283,16 @@ END) NOT VALID;
  #+BEGIN_SRC sql
 --- Gateway << InsideNetwork
 ALTER TABLE public."InsideNetwork"
-    ADD CONSTRAINT "InsideNetwork_gateway_check" CHECK ((gateway << ip_network)) NOT VALID;
+    ADD CONSTRAINT "InsideNetwork_gateway_check"
+    CHECK ((gateway << ip_network)) NOT VALID;
  #+END_SRC
 
 *** InsideNetwork.ip_network is /32,v4
  #+BEGIN_SRC sql
 --- in_net is v4
 ALTER TABLE public."InsideNetwork"
-    ADD CONSTRAINT "InsideNetwork_ip_network_family_check" CHECK ((family(ip_network) = 4)) NOT VALID;
+    ADD CONSTRAINT "InsideNetwork_ip_network_family_check"
+    CHECK ((family(ip_network) = 4)) NOT VALID;
  #+END_SRC
 
 
@@ -300,8 +304,14 @@ ALTER TABLE public."InsideNetwork"
 CREATE FUNCTION public."Forwarding_Translation_exists"() RETURNS trigger
     LANGUAGE plpgsql
     AS $$BEGIN
-	IF NOT EXISTS(SELECT FROM "Translation" WHERE nat_domain = NEW.nat_domain AND outside_address = NEW.outside_address AND inside_network >> NEW.inside_address) THEN
-		RAISE EXCEPTION 'No corresponding Translation exists for Forwarding: %', NEW USING ERRCODE = 'integrity_constraint_violation';
+	IF NOT EXISTS(
+            SELECT FROM "Translation"
+            WHERE nat_domain = NEW.nat_domain
+            AND outside_address = NEW.outside_address
+            AND inside_network >> NEW.inside_address
+        ) THEN
+		RAISE EXCEPTION 'No corresponding Translation exists for Forwarding: %',
+                NEW USING ERRCODE = 'integrity_constraint_violation';
 	END IF;
 	RETURN NEW;
 END$$;
@@ -312,7 +322,8 @@ END$$;
  #+BEGIN_SRC sql
 -- in_nets are disjoint
 ALTER TABLE ONLY public."InsideNetwork"
-    ADD CONSTRAINT "InsideNetwork_nat_domain_ip_network_excl" EXCLUDE USING gist (nat_domain WITH =, ip_network inet_ops WITH &&);
+    ADD CONSTRAINT "InsideNetwork_nat_domain_ip_network_excl"
+    EXCLUDE USING gist (nat_domain WITH =, ip_network inet_ops WITH &&);
  #+END_SRC
 
 *** DHCPHostReservation.inside_network exists
@@ -321,24 +332,32 @@ ALTER TABLE ONLY public."InsideNetwork"
 
 **** src
  #+BEGIN_SRC sql
-CREATE FUNCTION public."DHCPHostReservation_InsideNetwork_exists"() RETURNS trigger
+CREATE FUNCTION public."DHCPHostReservation_InsideNetwork_exists"()
+ RETURNS trigger
     LANGUAGE plpgsql STABLE STRICT LEAKPROOF
     AS $$BEGIN
-	IF NOT EXISTS(SELECT FROM "InsideNetwork" WHERE nat_domain = NEW.nat_domain AND ip_network >> NEW.ip) THEN
-		RAISE EXCEPTION 'InsideNetwork contains no ip_network for IP % in nat_domain %', NEW.ip, NEW.nat_domain USING ERRCODE = 'integrity_constraint_violation';
+	IF NOT EXISTS(
+            SELECT FROM "InsideNetwork"
+            WHERE nat_domain = NEW.nat_domain
+            AND ip_network >> NEW.ip
+        ) THEN
+		RAISE EXCEPTION 'InsideNetwork contains no ip_network for IP % in nat_domain %',
+                NEW.ip, NEW.nat_domain USING ERRCODE = 'integrity_constraint_violation';
 	END IF;
 	RETURN NEW;
 END$$;
 CREATE CONSTRAINT TRIGGER "DHCPHostReservation_InsideNetwork_exists"
     AFTER INSERT OR UPDATE OF ip ON public."DHCPHostReservation"
     DEFERRABLE INITIALLY IMMEDIATE
-    FOR EACH ROW EXECUTE PROCEDURE public."DHCPHostReservation_InsideNetwork_exists"();
+    FOR EACH ROW
+    EXECUTE PROCEDURE public."DHCPHostReservation_InsideNetwork_exists"();
  #+END_SRC
 *** Translation.inside_network disjoint
  #+BEGIN_SRC sql
 --- Translation in_nets excluded
 ALTER TABLE ONLY public."Translation"
-    ADD CONSTRAINT "Translation_Inside_excl" EXCLUDE USING gist (nat_domain WITH =, inside_network inet_ops WITH &&);
+    ADD CONSTRAINT "Translation_Inside_excl"
+    EXCLUDE USING gist (nat_domain WITH =, inside_network inet_ops WITH &&);
  #+END_SRC
 
 *** ∀Translation ∃InsideNetwork

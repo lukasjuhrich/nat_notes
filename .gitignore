@@ -175,3 +175,6 @@ dmypy.json
 #
 *.pdf
 nat.tex
+_minted-nat
+*.bbl
+ltximg

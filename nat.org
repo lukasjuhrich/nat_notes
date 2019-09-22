@@ -14,7 +14,6 @@
 \setminted{breaklines=true}
 #+end_export
 * Concept / Requirements
-@@latex:\label{sec:concept}@@
 
 I'll assume you've looked at the sql table definitions.  All we want
 to realize (by means of foreign keys or otherwise) are the following
@@ -135,7 +134,6 @@ To sum up, we get the following commutativity rules:
 
 
 * Motivating example
-@@latex:\label{sec:example}@@
 
 Consider
 
@@ -154,7 +152,6 @@ This already emphasizes some key features of this schema:
 
 
 * Realization (Schrader)
-@@latex:\label{sec:realization}@@
 ** Custom domains
 
  #+BEGIN_SRC sql

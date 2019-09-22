@@ -1,0 +1,474 @@
+% Created 2019-09-22 Sun 23:22
+% Intended LaTeX compiler: pdflatex
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{grffile}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\usepackage{amsmath,amsthm,amssymb,amsfonts,mathabx,mathtools,mathrsfs}
+\usepackage{tikz}
+\usepackage{tikz-cd}
+\DeclareUnicodeCharacter{2200}{\ensuremath{\forall}}
+\DeclareUnicodeCharacter{2203}{\ensuremath{\exists}}
+\newcommand{\then}{\mathbin{;}}
+\author{Lukas Juhrich}
+\date{\today}
+\title{Notes regarding the NAT schema}
+\hypersetup{
+ pdfauthor={Lukas Juhrich},
+ pdftitle={Notes regarding the NAT schema},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 26.2 (Org mode 9.1.9)}, 
+ pdflang={English}}
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+
+\section{Abstract concept}
+\label{sec:orgd7af39b}
+
+I'll assume you've looked at the sql table definitions.  All we want
+to realize (by means of foreign keys or otherwise) are the following
+relations:
+
+\subsection{Relational concept}
+\label{sec:org3450fef}
+
+\begin{tikzcd}
+             &  &                                                                 & \mathrm{Res} \arrow[llld, "\small\text{res\_dom}", bend right] \arrow[ld, "\small\text{res\_inip}"'] &                                                                                                           \\
+\mathrm{Dom} &  & \mathrm{InNet} \arrow[ll, "\small\text{innet\_dom}"]             &                                                                                                    & \mathrm{Forw} \arrow[lld, "\small\text{forw\_outip}"] \arrow[lu, "\small\text{forw\_inip}", bend right]     \\
+             &  & \mathrm{OutIp} \arrow[llu, "\small\text{outip\_dom}", bend left] &                                                                                                    & \mathrm{Trans} \arrow[ll, "\small\text{trans\_outip}", two heads] \arrow[llu, "\small\text{trans\_innet}"']
+\end{tikzcd}
+
+\subsection{Definitions of the relations}
+\label{sec:org4397750}
+
+\subsubsection{\texttt{outip\_dom} (Hard FKey)}
+\label{sec:org713e022}
+FKey \texttt{outip(dom) → dom(id)}
+
+\subsubsection{\texttt{innet\_dom} (Hard FKey)}
+\label{sec:orgdca99e4}
+FKey \texttt{innet(dom) → dom(id)}
+
+\subsubsection{\texttt{res\_dom} (Hard FKey)}
+\label{sec:org6fda4e3}
+FKey \texttt{innet(dom) → dom(id)}
+
+\subsubsection{\texttt{trans\_outip} (Hard (composite) FKey)}
+\label{sec:org66b164b}
+Composite FKey \texttt{trans(out\_ip, dom) → outip(ip, dom)}
+
+\subsubsection{\texttt{forw\_outip} (Hard (composite) FKey)}
+\label{sec:org97c9d82}
+Composite FKey \texttt{forw(dom, out\_ip) → outip(dom, ip)}
+
+\subsubsection{\texttt{forw\_inip} (Hard (composite) FKey)}
+\label{sec:org49d9eb0}
+Composite FKey \texttt{forw(dom, in\_ip) → res(dom, in\_ip)}
+
+\subsubsection{\texttt{trans\_innet}}
+\label{sec:org8792d72}
+\begin{align*}
+\mathrm{trans\_innet}\colon \mathrm{Trans} &\to \mathrm{Innet},\\
+\text{trans} &\sim \text{innet} :\Leftrightarrow \text{trans.in\_net} \subseteq \text{innet.net} \wedge \text{trans.dom} = \text{innet.dom}
+\end{align*}
+
+\begin{enumerate}
+\item Left totality
+\label{sec:org3bd645b}
+
+\textbf{\textbf{Each translation must be contained in a corresponding insidenetwork}}
+
+\item Left uniqueness
+\label{sec:org1514295}
+
+\(\text{trans}\sim \text{inet1} \wedge \text{trans}\sim \text{inet2} \implies \text{inet1} = \text{inet2}\)
+
+This implies that there may not be two overlapping insidenetworks.
+
+Ergo:  \textbf{\textbf{Insidenetworks must be disjoint}}
+\end{enumerate}
+
+\subsubsection{\texttt{res\_inip}}
+\label{sec:orgfc1458e}
+
+\begin{align*}
+\mathrm{res\_inip}\colon \mathrm{Res} &\to \mathrm{InNet},\\
+\text{res} &\sim \text{inip} :\Leftrightarrow \text{res.in\_net} \subseteq \text{innet.net} \wedge \text{res.dom} = \text{innet.dom}
+\end{align*}
+
+\begin{enumerate}
+\item Left totality
+\label{sec:org8702994}
+
+\textbf{\textbf{Each reservation must be contained in a corresponding insidenetwork}}
+
+\item Left uniqueness
+\label{sec:orgb32b1bd}
+
+Same argumentation as for \texttt{trans\_innet}: \textbf{\textbf{Insidenetworks must be disjoint}}
+\end{enumerate}
+
+\subsection{Additional Requirements}
+\label{sec:org5986b8c}
+
+\begin{itemize}
+\item \texttt{trans\_outip} should be surjective
+\item \texttt{Trans.innet} should be disjoint (is there an abstract reason
+why?)
+\end{itemize}
+
+\subsection{Commutativity of refs}
+\label{sec:orgd22b6b6}
+
+Surely, a translation should always reference an \texttt{in\_net} and an
+\texttt{out\_ip} of the same domain.  Speaking more precisely, this means that
+the following references should commute:$$
+\text{trans\_innet}\then\text{innet\_dom} = \text{trans\_outip}\then\text{outip\_dom}
+$$
+
+To sum up, we get the following commutativity rules:
+
+\begin{align}
+\text{res\_inip}\then\text{innet\_dom} &= \text{res\_dom}\\
+\text{trans\_innet}\then\text{innet\_dom} &= \text{trans\_outip}\then\text{outip\_dom}\\
+\text{forw\_inip}\then\text{res\_dom} &= \text{forw\_outip}\then\text{outip\_dom}
+\end{align}
+
+
+\section{{\bfseries\sffamily TODO} Implement domains}
+\label{sec:org4b447a0}
+
+\begin{verbatim}
+CREATE DOMAIN public.ip_port AS integer
+	CONSTRAINT ip_port_check CHECK (((VALUE >= 1) AND (VALUE <= 65535)));
+CREATE DOMAIN public.ip_protocol AS smallint
+	CONSTRAINT ip_protocol_check CHECK (((VALUE >= 0) AND (VALUE <= 255)));
+\end{verbatim}
+
+Perhaps follow \href{https://github.com/zzzeek/sqlalchemy/blob/master/lib/sqlalchemy/dialects/postgresql/json.py\#L71}{the JSON implementation}
+
+Also, see \href{https://docs.sqlalchemy.org/en/13/core/ddl.html\#sqlalchemy.schema.CreateColumn}{the CreateColumn example}
+
+\subsection{Testing the custom type}
+\label{sec:org0651d3e}
+To test, perhaps select the following minimal example:
+
+\begin{verbatim}
+from sqlalchemy import Table, Metadata, Column, Integer, String
+from sqlalchemy import schema
+
+metadata = MetaData()
+
+table = Table('mytable', MetaData(),
+	Column('x', Integer, info={"special":True}, primary_key=True),
+	Column('y', String(50)),
+	Column('z', String(20), info={"special":True})
+    )
+
+metadata.create_all(conn)
+\end{verbatim}
+
+…and in a test, we might do the following:
+
+\begin{verbatim}
+from unittest import TestCase
+from pycroft.model.types import IpPort
+
+class IpPortTestCase(TestCase):
+    def setUp(self):
+	# TODO set up this.conn
+	this.conn = None
+	this.metadata = MetaData()
+
+	table = Table(
+	    'mytable', this.metadata,
+	    Column('x', Integer, primary_key=True),
+	    Column('z', IpPort)
+	)
+
+    def safe_create_all(self):
+	try:
+	    this.metadata.create_all(this.conn)
+	except OperationalError:
+	    this.fail("Could not create table with custom type")
+	finally:
+	    pass  # TODO rollback stuff
+
+    def test_value_set(self):
+	# TODO add a row with that value and retrieve it again
+	pass
+
+    def test_value_filter(self):
+	# TODO add two rows with that value and filter after the one
+	pass
+
+    def test_constraint(self):
+	# TODO try to add something violating the check constraints
+	pass
+\end{verbatim}
+
+Perhaps the following should suffice:
+
+\begin{verbatim}
+
+class IpPort(sqltypes.TypeEngine):
+    """Represent our custom IpPort type.
+    """
+
+    __visit_name__ = "Test What should go here"
+
+
+ischema_names["ip_port"] = IpPort
+\end{verbatim}
+
+
+\section{Local Constraints}
+\label{sec:orgfa17104}
+\subsection{{\bfseries\sffamily TODO} Collect PKey-Constraints}
+\label{sec:orgd3f65e4}
+\subsection{{\bfseries\sffamily TODO} Collect Uniq-Constraints}
+\label{sec:org22be777}
+\subsection{OutsideIpAddress.ip\(_{\text{address}}\) is /32,v4}
+\label{sec:org96d0608}
+\begin{verbatim}
+--- OutsideIPAddress is /32v4
+CREATE TABLE public."OutsideIPAddress" (
+    nat_domain integer NOT NULL,
+    ip_address inet NOT NULL,
+    owner integer,
+    CONSTRAINT "OutsideIPAddress_ip_address_host"
+	CHECK (((family(ip_address) = 4) AND (masklen(ip_address) = 32)))
+);
+\end{verbatim}
+
+Realizable as follows:
+
+\begin{verbatim}
+__table_args__ = (
+    CheckConstraint(
+	'(((family(ip_address) = 4) AND (masklen(ip_address) = 32)))',
+	name='outside_ip_is_host_and_v4',
+    ),
+)
+\end{verbatim}
+
+\subsection{OutsideIpAddress.ip is /32,v4}
+\label{sec:org48d8c21}
+\begin{verbatim}
+--- DhcpHostReservation refs /32v4
+ALTER TABLE public."DHCPHostReservation"
+    ADD CONSTRAINT "DHCPHostReservation_ip_check" CHECK (((family(ip) = 4) AND (masklen(ip) = 32))) NOT VALID;
+\end{verbatim}
+
+\subsection{Forwarding.protocol \(\in \{6, 17, 33, 132\}\)}
+\label{sec:org5c3463b}
+\begin{verbatim}
+--- Forwarding protocol in ${6,17,33,132}$
+ALTER TABLE public."Forwarding"
+    ADD CONSTRAINT "Forwarding_protocol_port_check" CHECK (
+CASE
+    WHEN ((outside_port IS NOT NULL) OR (inside_port IS NOT NULL)) THEN ((protocol)::smallint = ANY (ARRAY[6, 17, 33, 132]))
+    ELSE NULL::boolean
+END) NOT VALID;
+\end{verbatim}
+
+\subsection{InsideNetwork.(gateway << ip\(_{\text{network}}\))}
+\label{sec:org57041dc}
+\begin{verbatim}
+--- Gateway << InsideNetwork
+ALTER TABLE public."InsideNetwork"
+    ADD CONSTRAINT "InsideNetwork_gateway_check" CHECK ((gateway << ip_network)) NOT VALID;
+\end{verbatim}
+
+\subsection{InsideNetwork.ip\(_{\text{network}}\) is /32,v4}
+\label{sec:org94a6dad}
+\begin{verbatim}
+--- in_net is v4
+ALTER TABLE public."InsideNetwork"
+    ADD CONSTRAINT "InsideNetwork_ip_network_family_check" CHECK ((family(ip_network) = 4)) NOT VALID;
+\end{verbatim}
+
+
+\section{Rel constraints}
+\label{sec:org14c8af7}
+\subsection{{\bfseries\sffamily TODO} Collect FKey-Constraints}
+\label{sec:org1ec613f}
+\subsection{Forwarding needs a translation (unused)}
+\label{sec:org42dac99}
+\begin{verbatim}
+--- TODO hold on a sec, this is not even used!
+CREATE FUNCTION public."Forwarding_Translation_exists"() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$BEGIN
+	IF NOT EXISTS(SELECT FROM "Translation" WHERE nat_domain = NEW.nat_domain AND outside_address = NEW.outside_address AND inside_network >> NEW.inside_address) THEN
+		RAISE EXCEPTION 'No corresponding Translation exists for Forwarding: %', NEW USING ERRCODE = 'integrity_constraint_violation';
+	END IF;
+	RETURN NEW;
+END$$;
+'col2 > col3 + 5', name='check1'
+\end{verbatim}
+
+\subsection{InsideNetwork.ip\(_{\text{network}}\) disjoint}
+\label{sec:orgd5424e7}
+\begin{verbatim}
+-- in_nets are disjoint
+ALTER TABLE ONLY public."InsideNetwork"
+    ADD CONSTRAINT "InsideNetwork_nat_domain_ip_network_excl" EXCLUDE USING gist (nat_domain WITH =, ip_network inet_ops WITH &&);
+\end{verbatim}
+
+\subsection{DHCPHostReservation.inside\(_{\text{network}}\) exists}
+\label{sec:org07fb136}
+\subsubsection{reasoning}
+\label{sec:orge2a68da}
+This realizes the weak fkey =DHCPHostReservation.inside\(_{\text{network}}\)<<=InsideNetwork
+
+\subsubsection{src}
+\label{sec:orgcae1707}
+\begin{verbatim}
+CREATE FUNCTION public."DHCPHostReservation_InsideNetwork_exists"() RETURNS trigger
+    LANGUAGE plpgsql STABLE STRICT LEAKPROOF
+    AS $$BEGIN
+	IF NOT EXISTS(SELECT FROM "InsideNetwork" WHERE nat_domain = NEW.nat_domain AND ip_network >> NEW.ip) THEN
+		RAISE EXCEPTION 'InsideNetwork contains no ip_network for IP % in nat_domain %', NEW.ip, NEW.nat_domain USING ERRCODE = 'integrity_constraint_violation';
+	END IF;
+	RETURN NEW;
+END$$;
+CREATE CONSTRAINT TRIGGER "DHCPHostReservation_InsideNetwork_exists"
+    AFTER INSERT OR UPDATE OF ip ON public."DHCPHostReservation"
+    DEFERRABLE INITIALLY IMMEDIATE
+    FOR EACH ROW EXECUTE PROCEDURE public."DHCPHostReservation_InsideNetwork_exists"();
+\end{verbatim}
+\subsection{Translation.inside\(_{\text{network}}\) disjoint}
+\label{sec:org4a94190}
+\begin{verbatim}
+--- Translation in_nets excluded
+ALTER TABLE ONLY public."Translation"
+    ADD CONSTRAINT "Translation_Inside_excl" EXCLUDE USING gist (nat_domain WITH =, inside_network inet_ops WITH &&);
+\end{verbatim}
+
+\subsection{∀Translation ∃InsideNetwork}
+\label{sec:orgb5692ea}
+\subsubsection{reasoning}
+\label{sec:orga95e552}
+This realizes the weak fkey \texttt{Translation.inside\_network<<=InsideNetwork}
+
+\subsubsection{src}
+\label{sec:org57e0ed3}
+\begin{verbatim}
+CREATE FUNCTION public."Translation_InsideNetwork_exists"() RETURNS trigger
+    LANGUAGE plpgsql STRICT
+    AS $$BEGIN
+	IF NOT EXISTS(SELECT FROM "InsideNetwork" WHERE nat_domain = NEW.nat_domain AND ip_network >>= NEW.inside_network) THEN
+		--RAISE EXCEPTION 'No corresponding InsideNetwork for Translation: %', NEW USING ERRCODE = 'integrity_constraint_violation';
+		RAISE EXCEPTION integrity_constraint_violation USING DETAIL = FORMAT('No corresponding %I for %I: %s', 'InsideNetwork', 'Translation', NEW), TABLE = 'Translation';
+	END IF;
+	RETURN NEW;
+END$$;
+CREATE CONSTRAINT TRIGGER "Translation_InsideNetwork_exists"
+    AFTER INSERT OR UPDATE OF inside_network ON public."Translation"
+    DEFERRABLE INITIALLY IMMEDIATE
+    FOR EACH ROW EXECUTE PROCEDURE public."Translation_InsideNetwork_exists"();
+\end{verbatim}
+
+
+\section{Cascades}
+\label{sec:org470a0e8}
+\subsection{InsideNetwork del/up/trunc}
+\label{sec:org070e60a}
+\subsubsection{reasoning}
+\label{sec:org6dcd694}
+These are effectively cascades to \texttt{DHCPHostReservation},
+\texttt{Translation}.  This is necessary because
+\begin{itemize}
+\item \texttt{DHCPHostReservation.ip << InsideNetwork.ip\_network}
+\item \texttt{Translation.inside\_network << InsideNetwork.ip\_network}
+\end{itemize}
+
+are weak couplings instead of FKeys.
+
+\subsubsection{src}
+\label{sec:org3633ba4}
+\begin{verbatim}
+CREATE FUNCTION public."InsideNetwork_delete"() RETURNS trigger
+    LANGUAGE plpgsql STRICT LEAKPROOF
+    AS $$BEGIN
+	DELETE FROM "DHCPHostReservation" WHERE nat_domain = OLD.nat_domain AND ip << OLD.Ip_network;
+	DELETE FROM "Translation" WHERE nat_domain = OLD.nat_domain AND inside_network <<= OLD.ip_network;
+	RETURN NULL;
+END$$;
+CREATE TRIGGER "InsideNetwork_delete" AFTER DELETE ON public."InsideNetwork" FOR EACH ROW EXECUTE PROCEDURE public."InsideNetwork_delete"();
+
+CREATE FUNCTION public."InsideNetwork_truncate"() RETURNS trigger
+    LANGUAGE plpgsql STRICT LEAKPROOF
+    AS $$BEGIN
+	TRUNCATE "DHCPHostReservation";
+	TRUNCATE "Translation";
+	RETURN NULL;
+END$$;
+CREATE TRIGGER "InsideNetwork_truncate" AFTER TRUNCATE ON public."InsideNetwork" FOR EACH STATEMENT EXECUTE PROCEDURE public."InsideNetwork_truncate"();
+
+CREATE FUNCTION public."InsideNetwork_update"() RETURNS trigger
+    LANGUAGE plpgsql STRICT LEAKPROOF
+    AS $$BEGIN
+	DELETE FROM "DHCPHostReservation" WHERE nat_domain = OLD.nat_domain AND ip << OLD.ip_network AND NOT ip << NEW.ip_network;
+	DELETE FROM "Translation" WHERE nat_domain = OLD.nat_domain AND inside_network <<= OLD.ip_network AND NOT inside_network <<= NEW.ip_network;
+	RETURN NULL;
+END$$;
+CREATE TRIGGER "InsideNetwork_update" AFTER UPDATE OF ip_network ON public."InsideNetwork" FOR EACH ROW EXECUTE PROCEDURE public."InsideNetwork_update"();
+\end{verbatim}
+
+\subsection{Translation del/up (unused)}
+\label{sec:org06d28b8}
+\begin{verbatim}
+--- UNUSED
+CREATE FUNCTION public."Translation_delete"() RETURNS trigger
+    LANGUAGE plpgsql STRICT LEAKPROOF
+    AS $$BEGIN
+	DELETE FROM "Forwarding" WHERE nat_domain = OLD.nat_domain AND inside_address <<= OLD.inside_network;
+	RETURN NULL;
+END$$;
+
+--- UNUSED
+CREATE FUNCTION public."Translation_update"() RETURNS trigger
+    LANGUAGE plpgsql STRICT LEAKPROOF
+    AS $$BEGIN
+	DELETE FROM "Forwarding" WHERE nat_domain = OLD.nat_domain AND inside_address <<= OLD.inside_network AND NOT inside_address <<= NEW.inside_network;
+	RETURN NULL;
+END$$;
+\end{verbatim}
+
+\subsection{Translation truncate}
+\label{sec:orgee768f2}
+\subsubsection{reasoning?}
+\label{sec:org8cf0e6a}
+This realizes a cascade to \texttt{Forwarding} – but wouldn't this make
+more sense on \texttt{InsideNetwork} or \texttt{OutsideIpAddress}?  Or anything
+to which we have a weak relationship?
+
+\subsubsection{src}
+\label{sec:orgfde8ba9}
+\begin{verbatim}
+CREATE FUNCTION public."Translation_truncate"() RETURNS trigger
+    LANGUAGE plpgsql STRICT LEAKPROOF
+    AS $$BEGIN
+	TRUNCATE "Forwarding";
+	RETURN NULL;
+END$$;
+CREATE TRIGGER "Translation_truncate" AFTER TRUNCATE ON public."Translation" FOR EACH STATEMENT EXECUTE PROCEDURE public."Translation_truncate"();
+--- FKEY-Constraints…
+\end{verbatim}
+\end{document}

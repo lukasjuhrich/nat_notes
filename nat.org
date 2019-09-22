@@ -9,6 +9,10 @@
 #+LATEX_HEADER: \DeclareUnicodeCharacter{2203}{\ensuremath{\exists}}
 #+LATEX_HEADER: \newcommand{\then}{\mathbin{;}}
 
+
+#+begin_export latex
+\setminted{breaklines=true}
+#+end_export
 * Concept / Requirements
 
 I'll assume you've looked at the sql table definitions.  All we want

@@ -150,8 +150,8 @@ To sum up, we get the following commutativity rules:
 ** Behavioral requirements
 
 *** Cascades
-    Most relationships given there should have corresponding =ON
-    UPDATE=/=ON DELETE= options.  To be listed.
+    Most relationships given there should have corresponding
+    =ON UPDATE= / =ON DELETE= options.  To be listed.
 
 *** TODO A user changes his IP
 

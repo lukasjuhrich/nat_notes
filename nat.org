@@ -278,7 +278,7 @@ ischema_names["ip_port"] = IpPort
 ** Local Constraints
 *** TODO Collect PKey-Constraints
 *** TODO Collect Uniq-Constraints
-*** OutsideIpAddress.ip_address is /32,v4
+*** =OutsideIpAddress.ip_address= is /32,v4
  #+BEGIN_SRC sql
 --- OutsideIPAddress is /32v4
 CREATE TABLE public."OutsideIPAddress" (
@@ -301,7 +301,7 @@ __table_args__ = (
 )
  #+END_SRC
 
-*** OutsideIpAddress.ip is /32,v4
+*** =OutsideIpAddress.ip= is /32,v4
  #+BEGIN_SRC sql
 --- DhcpHostReservation refs /32v4
 ALTER TABLE public."DHCPHostReservation"
@@ -309,7 +309,7 @@ ALTER TABLE public."DHCPHostReservation"
     CHECK (((family(ip) = 4) AND (masklen(ip) = 32))) NOT VALID;
  #+END_SRC
 
-*** Forwarding.protocol $\in \{6, 17, 33, 132\}$
+*** =Forwarding.protocol= $\in \{6, 17, 33, 132\}$
  #+BEGIN_SRC sql
 --- Forwarding protocol in ${6,17,33,132}$
 ALTER TABLE public."Forwarding"
@@ -321,7 +321,7 @@ CASE
 END) NOT VALID;
  #+END_SRC
 
-*** InsideNetwork.(gateway << ip_network)
+*** =InsideNetwork.(gateway << ip_network)=
  #+BEGIN_SRC sql
 --- Gateway << InsideNetwork
 ALTER TABLE public."InsideNetwork"
@@ -329,7 +329,7 @@ ALTER TABLE public."InsideNetwork"
     CHECK ((gateway << ip_network)) NOT VALID;
  #+END_SRC
 
-*** InsideNetwork.ip_network is /32,v4
+*** =InsideNetwork.ip_network= is /32,v4
  #+BEGIN_SRC sql
 --- in_net is v4
 ALTER TABLE public."InsideNetwork"

@@ -1,5 +1,5 @@
     FILE=${FILE:-nat.pdf}
-    SSH_TARGET=${SSH_TARGET:-at:public_html}
+    SSH_TARGET=${SSH_TARGET:-agdsn.me:public_html}
 
 pdf:
     emacs --batch -l org -l emacs_convert.el nat.org

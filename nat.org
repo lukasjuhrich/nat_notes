@@ -224,42 +224,41 @@ metadata.create_all(conn)
 
  …and in a test, we might do the following:
 
- #+BEGIN_SRC python
-from unittest import TestCase
+#+BEGIN_SRC python
+import pytest
 from pycroft.model.types import IpPort
 
-class IpPortTestCase(TestCase):
-    def setUp(self):
-        # TODO set up this.conn
-        this.conn = None
-        this.metadata = MetaData()
+@pytest.fixture(scope='session')
+def metadata():
+    metadata = MetaData()
+    table = Table(
+        'mytable', metadata,
+        Column('x', Integer, primary_key=True),
+        Column('z', IpPort)
+    )
+    return metadata
 
-        table = Table(
-            'mytable', this.metadata,
-            Column('x', Integer, primary_key=True),
-            Column('z', IpPort)
-        )
+@pytest.fixture(scope='session')
+def conn(metadata):
+    try:
+        this.metadata.create_all(this.conn)
+    except OperationalError:
+        this.fail("Could not create table with custom type")
+    finally:
+        pass  # TODO rollback stuff
 
-    def safe_create_all(self):
-        try:
-            this.metadata.create_all(this.conn)
-        except OperationalError:
-            this.fail("Could not create table with custom type")
-        finally:
-            pass  # TODO rollback stuff
+def test_value_set(conn):
+    # TODO add a row with that value and retrieve it again
+    pass
 
-    def test_value_set(self):
-        # TODO add a row with that value and retrieve it again
-        pass
+def test_value_filter(conn):
+    # TODO add two rows with that value and filter after the one
+    pass
 
-    def test_value_filter(self):
-        # TODO add two rows with that value and filter after the one
-        pass
-
-    def test_constraint(self):
-        # TODO try to add something violating the check constraints
-        pass
- #+END_SRC
+def test_constraint(conn):
+    # TODO try to add something violating the check constraints
+    pass
+#+END_SRC
 
  Perhaps the following should suffice:
 
